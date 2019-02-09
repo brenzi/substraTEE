@@ -1,0 +1,6 @@
+[submodule "substrate"]
+	path = substrate
+	url = https://github.com/paritytech/substrate.git
+[submodule "rust-sgx-sdk"]
+	path = rust-sgx-sdk
+	url = https://github.com/baidu/rust-sgx-sdk.git
