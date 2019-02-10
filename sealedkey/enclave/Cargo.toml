@@ -18,3 +18,10 @@ sgx_rand = { path = "../../rust-sgx-sdk/sgx_rand" }
 sgx_tcrypto = { path = "../../rust-sgx-sdk/sgx_tcrypto" }
 rust-crypto = { path = "../../rust-sgx-sdk/third_party/rust-crypto" }
 rust-base58 = { path = "../../rust-sgx-sdk/third_party/rust-base58" }
+sgx_crypto_helper = { path = "../../rust-sgx-sdk/samplecode/static-data-distribution/enclave/sgx_crypto_helper", default-features = false, features = ["enclave_cargo"] }
+
+[target.'cfg(target_env = "sgx")'.dependencies]
+sgx_crypto_helper = { path = "../../rust-sgx-sdk/samplecode/static-data-distribution/enclave/sgx_crypto_helper", default-features = false }
+
+[dependencies]
+serde_json = { path = "../../rust-sgx-sdk/third_party/serde-rs/json" }

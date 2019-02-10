@@ -27,14 +27,24 @@ extern crate sgx_rand;
 
 extern crate crypto;
 extern crate rust_base58;
+extern crate serde_json;
+extern crate sgx_crypto_helper;
 
 use sgx_types::{sgx_status_t, sgx_sealed_data_t};
 use sgx_types::marker::ContiguousMemory;
 use sgx_tseal::{SgxSealedData};
 use sgx_rand::{Rng, StdRng};
+use std::io::{self, Read, Write};
+use std::sgxfs::SgxFile;
 use std::slice;
+use std::string::String;
+use std::vec::Vec;
 use crypto::ed25519::{keypair, signature};
 use rust_base58::{ToBase58};
+use sgx_crypto_helper::RsaKeyPair;
+use sgx_crypto_helper::rsa3072::Rsa3072KeyPair;
+
+pub const KEYFILE: &'static str = "sealed_rsa_key.bin";
 
 #[no_mangle]
 pub extern "C" fn create_sealed_key(sealed_seed: * mut u8, sealed_seed_size: u32, pubkey: * mut u8, pubkey_size: u32) -> sgx_status_t {
@@ -70,7 +80,29 @@ pub extern "C" fn create_sealed_key(sealed_seed: * mut u8, sealed_seed_size: u32
     };
     pubkey_slice.clone_from_slice(&_pubkey);
     
-    sgx_status_t::SGX_SUCCESS
+    // also create a RSA keypair
+    let rsa_keypair = Rsa3072KeyPair::new().unwrap();
+    let rsa_key_json = serde_json::to_string(&rsa_keypair).unwrap();
+    println!("[+] enclave: generated RSA3072 key pair. Cleartext: {}", rsa_key_json);
+
+    match SgxFile::create(KEYFILE) {
+        Ok(mut f) => match f.write_all(rsa_key_json.as_bytes()) {
+            Ok(()) => {
+                println!("SgxFile write key file success!");
+                sgx_status_t::SGX_SUCCESS
+            }
+            Err(x) => {
+                println!("SgxFile write key file failed! {}", x);
+                sgx_status_t::SGX_ERROR_UNEXPECTED
+            }
+        },
+        Err(x) => {
+            println!("SgxFile create file {} error {}", KEYFILE, x);
+            sgx_status_t::SGX_ERROR_UNEXPECTED
+        }
+    }
+
+    //sgx_status_t::SGX_SUCCESS
 }
 
 #[no_mangle]
@@ -111,6 +143,91 @@ pub extern "C" fn sign(sealed_seed: * mut u8, sealed_seed_size: u32,
     };
     let _sig = signature(&msg_slice, &_privkey);
     sig_slice.clone_from_slice(&_sig);
+
+    sgx_status_t::SGX_SUCCESS
+}
+
+#[no_mangle]
+pub extern "C" fn decrypt(ciphertext: * mut u8, ciphertext_size: u32) -> sgx_status_t {
+
+    let ciphertext_slice = unsafe { slice::from_raw_parts(ciphertext, ciphertext_size as usize) };
+
+    //restore RSA key pair from file
+    let mut keyvec: Vec<u8> = Vec::new();
+    let key_json_str = match SgxFile::open(KEYFILE) {
+        Ok(mut f) => match f.read_to_end(&mut keyvec) {
+            Ok(len) => {
+                println!("Read {} bytes from Key file", len);
+                std::str::from_utf8(&keyvec).unwrap()
+            }
+            Err(x) => {
+                println!("Read keyfile failed {}", x);
+                return sgx_status_t::SGX_ERROR_UNEXPECTED;
+            }
+        },
+        Err(x) => {
+            println!("get_sealed_pcl_key cannot open keyfile, please check if key is provisioned successfully! {}", x);
+            return sgx_status_t::SGX_ERROR_UNEXPECTED;
+        }
+    };
+    //println!("key_json = {}", key_json_str);
+    let rsa_keypair: Rsa3072KeyPair = serde_json::from_str(&key_json_str).unwrap();
+    
+    let mut plaintext = Vec::new();
+    rsa_keypair.decrypt_buffer(&ciphertext_slice, &mut plaintext).unwrap();
+
+    let decrypted_string = String::from_utf8(plaintext).unwrap();
+    println!("decrypted data = {}", decrypted_string);
+    sgx_status_t::SGX_SUCCESS
+}
+
+#[no_mangle]
+pub extern "C" fn get_rsa_encryption_pubkey(pubkey: * mut u8, pubkey_size: u32) -> sgx_status_t {
+
+    let pubkey_slice = unsafe { slice::from_raw_parts(pubkey, pubkey_size as usize) };
+
+    //restore RSA key pair from file
+    let mut keyvec: Vec<u8> = Vec::new();
+    let key_json_str = match SgxFile::open(KEYFILE) {
+        Ok(mut f) => match f.read_to_end(&mut keyvec) {
+            Ok(len) => {
+                println!("Read {} bytes from Key file", len);
+                std::str::from_utf8(&keyvec).unwrap()
+            }
+            Err(x) => {
+                println!("Read keyfile failed {}", x);
+                return sgx_status_t::SGX_ERROR_UNEXPECTED;
+            }
+        },
+        Err(x) => {
+            println!("get_sealed_pcl_key cannot open keyfile, please check if key is provisioned successfully! {}", x);
+            return sgx_status_t::SGX_ERROR_UNEXPECTED;
+        }
+    };
+    //println!("key_json = {}", key_json_str);
+    let rsa_keypair: Rsa3072KeyPair = serde_json::from_str(&key_json_str).unwrap();
+ /*
+ TODO: should only return pubkey, not keypair. But SgxRsaPubkey isnt serializable!
+
+    let res = rsa_keypair.to_pubkey();
+    let _pubkey = match res {
+        Ok(x) => x,
+        _ => {
+            println!("couldn't create pubkey form rsa keypair");
+            return sgx_status_t::SGX_ERROR_INVALID_PARAMETER;
+        },
+    };
+
+    let _pubkey_json = serde_json::to_string(&_pubkey).unwrap();
+    println!("[+] enclave: pubkey is: {}", _pubkey_json);   
+*/
+    // now write pubkey back to caller
+    let pubkey_slice = unsafe {
+        slice::from_raw_parts_mut(pubkey, pubkey_size as usize)
+    };
+
+    let keypair_json = serde_json::to_string(&rsa_keypair).unwrap();
+    pubkey_slice.clone_from_slice(keypair_json.as_bytes());
 
     sgx_status_t::SGX_SUCCESS
 }

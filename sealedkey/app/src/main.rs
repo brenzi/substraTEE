@@ -40,7 +40,14 @@ extern {
     fn sign(eid: sgx_enclave_id_t, retval: *mut sgx_status_t,
         sealed_seed: * mut u8, sealed_seed_size: u32, 
         msg: * mut u8, msg_size: u32,
-        signature: * mut u8, signature_size: u32) -> sgx_status_t;               
+        signature: * mut u8, signature_size: u32) -> sgx_status_t;  
+    
+    fn get_rsa_encryption_pubkey(eid: sgx_enclave_id_t, retval: *mut sgx_status_t,
+        pubkey: * mut u8, pubkey_size: u32) -> sgx_status_t;
+
+    fn decrypt(eid: sgx_enclave_id_t, retval: *mut sgx_status_t,
+        ciphertext: * mut u8, ciphertext_size: u32) -> sgx_status_t;
+                     
 }
 
 fn init_enclave() -> SgxResult<SgxEnclave> {
