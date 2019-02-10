@@ -40,116 +40,63 @@ extern crate sgx_tcrypto;
 extern crate sgx_tstd as std;
 extern crate sgx_rand;
 
+extern crate crypto;
+extern crate rust_base58;
+
 use sgx_types::{sgx_status_t, sgx_sealed_data_t};
 use sgx_types::marker::ContiguousMemory;
 use sgx_tseal::{SgxSealedData};
 use sgx_rand::{Rng, StdRng};
 use sgx_tcrypto::*;
 use std::vec::Vec;
+use crypto::ed25519::keypair;
+use rust_base58::{ToBase58, FromBase58};
 
-#[derive(Copy, Clone, Default, Debug)]
-struct RandData {
-    key: u32,
-    rand: [u8; 16],
-}
-
-unsafe impl ContiguousMemory for RandData {}
+//unsafe impl<'a> ContiguousMemory for RsaSecrets<'a> {}
 
 #[no_mangle]
-pub extern "C" fn create_sealeddata(sealed_log: * mut u8, sealed_log_size: u32) -> sgx_status_t {
+pub extern "C" fn create_sealed_key(sealed_seed: * mut u8, sealed_seed_size: u32, pubkey: * mut u8, pubkey_size: u32) -> sgx_status_t {
 
-    let mut data = RandData::default();
-    data.key = 0x1234;
+    let mut seed = [0u8; 32];
 
     let mut rand = match StdRng::new() {
         Ok(rng) => rng,
         Err(_) => { return sgx_status_t::SGX_ERROR_UNEXPECTED; },
     };
-    rand.fill_bytes(&mut data.rand);
+    rand.fill_bytes(&mut seed);
 
     let aad: [u8; 0] = [0_u8; 0];
-    let result = SgxSealedData::<RandData>::seal_data(&aad, &data);
+    let result = SgxSealedData::<[u8; 32]>::seal_data(&aad, &seed);
     let sealed_data = match result {
         Ok(x) => x,
         Err(ret) => { return ret; },
     };
 
-    let opt = to_sealed_log(&sealed_data, sealed_log, sealed_log_size);
+    let opt = to_sealed_log(&sealed_data, sealed_seed, sealed_seed_size);
     if opt.is_none() {
         return sgx_status_t::SGX_ERROR_INVALID_PARAMETER;
     }
 
-    println!("{:?}", data);
-
-    // now also create a keypair
-    let mod_size: i32 = 256;
-    let exp_size: i32 = 4;
-    let mut n: Vec<u8> = vec![0_u8; mod_size as usize];
-    let mut d: Vec<u8> = vec![0_u8; mod_size as usize];
-    let mut e: Vec<u8> = vec![1, 0, 1, 0];
-    let mut p: Vec<u8> = vec![0_u8; mod_size as usize / 2];
-    let mut q: Vec<u8> = vec![0_u8; mod_size as usize / 2];
-    let mut dmp1: Vec<u8> = vec![0_u8; mod_size as usize / 2];
-    let mut dmq1: Vec<u8> = vec![0_u8; mod_size as usize / 2];
-    let mut iqmp: Vec<u8> = vec![0_u8; mod_size as usize / 2];
-
-    let result = rsgx_create_rsa_key_pair(mod_size,
-                                          exp_size,
-                                          n.as_mut_slice(),
-                                          d.as_mut_slice(),
-                                          e.as_mut_slice(),
-                                          p.as_mut_slice(),
-                                          q.as_mut_slice(),
-                                          dmp1.as_mut_slice(),
-                                          dmq1.as_mut_slice(),
-                                          iqmp.as_mut_slice());
-
-    match result {
-        Err(x) => {
-            return x;
-        },
-        Ok(()) => {},
-    }
-
-    let privkey = SgxRsaPrivKey::new();
-    let pubkey = SgxRsaPubKey::new();
-
-    let result = pubkey.create(mod_size,
-                               exp_size,
-                               n.as_slice(),
-                               e.as_slice());
-    match result {
-        Err(x) => return x,
-        Ok(()) => {},
-    };
-
-    let result = privkey.create(mod_size,
-                                exp_size,
-                                e.as_slice(),
-                                p.as_slice(),
-                                q.as_slice(),
-                                dmp1.as_slice(),
-                                dmq1.as_slice(),
-                                iqmp.as_slice());
-    match result {
-        Err(x) => return x,
-        Ok(()) => {},
-};
-
+    //create ed25519 keypair
+    let (privkey, pubkey) = keypair(&seed);
+    println!("enclave generated sealed keyair with pubkey: {:?}", pubkey.to_base58());
+    
+    //println!("{:?}", data);
 
     sgx_status_t::SGX_SUCCESS
 }
 
 #[no_mangle]
-pub extern "C" fn verify_sealeddata(sealed_log: * mut u8, sealed_log_size: u32) -> sgx_status_t {
+pub extern "C" fn verify_sealeddata(sealed_seed: * mut u8, sealed_seed_size: u32) -> sgx_status_t {
 
-    let opt = from_sealed_log::<RandData>(sealed_log, sealed_log_size);
+    let opt = from_sealed_log::<[u8; 32]>(sealed_seed, sealed_seed_size);
     let sealed_data = match opt {
         Some(x) => x,
         None => {
             return sgx_status_t::SGX_ERROR_INVALID_PARAMETER;
         },
     };
+
 
     let result = sealed_data.unseal_data();
     let unsealed_data = match result {
@@ -159,9 +106,11 @@ pub extern "C" fn verify_sealeddata(sealed_log: * mut u8, sealed_log_size: u32) 
         },
     };
 
-    let data = unsealed_data.get_decrypt_txt();
+    let seed = unsealed_data.get_decrypt_txt();
+    //create ed25519 keypair
+    let (privkey, pubkey) = keypair(seed);
 
-    println!("{:?}", data);
+    println!("enclave restored sealed keyair with pubkey: {:?}", pubkey.to_base58());
 
     sgx_status_t::SGX_SUCCESS
 }

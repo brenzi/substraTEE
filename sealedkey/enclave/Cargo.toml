@@ -16,3 +16,5 @@ sgx_tseal = { path = "../../rust-sgx-sdk/sgx_tseal" }
 sgx_tstd = { path = "../../rust-sgx-sdk/sgx_tstd" }
 sgx_rand = { path = "../../rust-sgx-sdk/sgx_rand" }
 sgx_tcrypto = { path = "../../rust-sgx-sdk/sgx_tcrypto" }
+rust-crypto = { path = "../../rust-sgx-sdk/third_party/rust-crypto" }
+rust-base58 = { path = "../../rust-sgx-sdk/third_party/rust-base58" }

@@ -41,11 +41,12 @@ static ENCLAVE_FILE: &'static str = "enclave.signed.so";
 static ENCLAVE_TOKEN: &'static str = "enclave.token";
 
 extern {
-    fn create_sealeddata(eid: sgx_enclave_id_t, retval: *mut sgx_status_t,
-        sealed_log: * mut u8, sealed_log_size: u32) -> sgx_status_t;
+    fn create_sealed_key(eid: sgx_enclave_id_t, retval: *mut sgx_status_t,
+        sealed_seed: * mut u8, sealed_seed_size: u32, 
+        pubkey: * mut u8, pubkey_size: u32) -> sgx_status_t;
     
     fn verify_sealeddata(eid: sgx_enclave_id_t, retval: *mut sgx_status_t,
-        sealed_log: * mut u8, sealed_log_size: u32) -> sgx_status_t;               
+        sealed_seed: * mut u8, sealed_seed_size: u32) -> sgx_status_t;               
 }
 
 fn init_enclave() -> SgxResult<SgxEnclave> {
@@ -129,17 +130,22 @@ fn main() {
         },
     };
 
-    let sealed_log_size = 1024;
-    let mut sealed_log = vec![0u8; sealed_log_size as usize];
+    let sealed_seed_size = 1024;
+    let mut sealed_seed = vec![0u8; sealed_seed_size as usize];
+    let pubkey_size = 32;
+    let mut pubkey = vec![0u8; pubkey_size as usize];
 
 
     let mut retval = sgx_status_t::SGX_SUCCESS;
 
     let result = unsafe {
-        create_sealeddata(enclave.geteid(),
+        create_sealed_key(enclave.geteid(),
                       &mut retval,
-                      sealed_log.as_mut_ptr(),
-                      sealed_log_size)
+                      sealed_seed.as_mut_ptr(),
+                      sealed_seed_size,
+                      pubkey.as_mut_ptr(),
+                      pubkey_size,
+                      )
     };
  
     match result {
@@ -150,15 +156,15 @@ fn main() {
         }
     }
     // importing sgx_tseal causes collision with std
-    //let sdata = SgxSealedData::<u8>::from_raw_sealed_data_t(sealed_log.as_mut_ptr() as * mut sgx_sealed_data_t, sealed_log_size);
+    //let sdata = SgxSealedData::<u8>::from_raw_sealed_data_t(sealed_seed.as_mut_ptr() as * mut sgx_sealed_data_t, sealed_seed_size);
     
     // TODO: print sealeddata meta
 
     let result = unsafe {
         verify_sealeddata(enclave.geteid(),
                       &mut retval,
-                      sealed_log.as_mut_ptr(),
-                      sealed_log_size)
+                      sealed_seed.as_mut_ptr(),
+                      sealed_seed_size)
     };
  
     match result {
