@@ -1,10 +1,10 @@
 [package]
-name = "Sealdatasampleenclave"
+name = "SealedKeyEnclave"
 version = "1.0.0"
-authors = ["Baidu"]
+authors = ["Alain Brenzikofer"]
 
 [lib]
-name = "sealdatasampleenclave"
+name = "sealedkeyenclave"
 crate-type = ["staticlib"]
 
 [features]

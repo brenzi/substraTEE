@@ -1,41 +1,33 @@
-// Copyright (C) 2017-2018 Baidu, Inc. All Rights Reserved.
+//  Copyright (c) 2019 Alain Brenzikofer
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions
-// are met:
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
 //
-//  * Redistributions of source code must retain the above copyright
-//    notice, this list of conditions and the following disclaimer.
-//  * Redistributions in binary form must reproduce the above copyright
-//    notice, this list of conditions and the following disclaimer in
-//    the documentation and/or other materials provided with the
-//    distribution.
-//  * Neither the name of Baidu, Inc., nor the names of its
-//    contributors may be used to endorse or promote products derived
-//    from this software without specific prior written permission.
+//       http://www.apache.org/licenses/LICENSE-2.0
 //
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
 
 extern crate sgx_types;
 extern crate sgx_urts;
 //extern crate sgx_tseal;
 extern crate dirs;
+extern crate rust_base58;
+extern crate crypto;
+
 use sgx_types::*;
 use sgx_urts::SgxEnclave;
 //use sgx_tseal::{SgxSealedData};
 use std::io::{Read, Write};
 use std::fs;
 use std::path;
+use std::str;
+use rust_base58::{ToBase58, FromBase58};
+use crypto::ed25519::{keypair, verify};
 
 static ENCLAVE_FILE: &'static str = "enclave.signed.so";
 static ENCLAVE_TOKEN: &'static str = "enclave.token";
@@ -45,8 +37,10 @@ extern {
         sealed_seed: * mut u8, sealed_seed_size: u32, 
         pubkey: * mut u8, pubkey_size: u32) -> sgx_status_t;
     
-    fn verify_sealeddata(eid: sgx_enclave_id_t, retval: *mut sgx_status_t,
-        sealed_seed: * mut u8, sealed_seed_size: u32) -> sgx_status_t;               
+    fn sign(eid: sgx_enclave_id_t, retval: *mut sgx_status_t,
+        sealed_seed: * mut u8, sealed_seed_size: u32, 
+        msg: * mut u8, msg_size: u32,
+        signature: * mut u8, signature_size: u32) -> sgx_status_t;               
 }
 
 fn init_enclave() -> SgxResult<SgxEnclave> {
@@ -157,16 +151,32 @@ fn main() {
     }
     // importing sgx_tseal causes collision with std
     //let sdata = SgxSealedData::<u8>::from_raw_sealed_data_t(sealed_seed.as_mut_ptr() as * mut sgx_sealed_data_t, sealed_seed_size);
+    println!("[+] enclave returned pubkey: {:?}", pubkey.to_base58());
     
-    // TODO: print sealeddata meta
+    // now let the enclave sign our message
+    //let msg = b"This message is true";
+    
+    //let mut msg = vec![0u8; msg_size as usize];
+    let mut msg = b"This message is true".to_vec();
+
+    println!("let enclave sign message: {}", str::from_utf8(&msg).unwrap());
+
+    //allocate signature
+    let signature_size = 64;
+    let mut signature = vec![0u8; signature_size as usize];
 
     let result = unsafe {
-        verify_sealeddata(enclave.geteid(),
+        sign(enclave.geteid(),
                       &mut retval,
                       sealed_seed.as_mut_ptr(),
-                      sealed_seed_size)
+                      sealed_seed_size,
+                      msg.as_mut_ptr(),
+                      msg.len() as u32,
+                      signature.as_mut_ptr(),
+                      signature_size
+                      )
     };
- 
+
     match result {
         sgx_status_t::SGX_SUCCESS => {},
         _ => {
@@ -174,10 +184,13 @@ fn main() {
             return;
         }
     }
- 
 
-
-    println!("[+] sealeddata success...");
+    // verify signature with pubkey
+    let result = verify(&msg[..], &pubkey[..], &signature[..]);
+    match result {
+        true => {println!("[+] enclave signature is correct!");}
+        _ => {println!("[-] enclave signature is incorrect!");}
+    }
 
     enclave.destroy();
 }

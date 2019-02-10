@@ -1,11 +1,13 @@
 [package]
 name = "app"
 version = "1.0.0"
-authors = ["Baidu"]
+authors = ["Alain Brenzikofer"]
 build = "build.rs"
 
 [dependencies]
 sgx_types = { path = "../../rust-sgx-sdk/sgx_types" }
 sgx_urts = { path = "../../rust-sgx-sdk/sgx_urts" }
 sgx_tseal = { path = "../../rust-sgx-sdk/sgx_tseal" }
+rust-base58 = "*"
+rust-crypto = "*"
 dirs = "1.0.2"
