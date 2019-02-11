@@ -18,7 +18,7 @@ extern crate sgx_urts;
 extern crate dirs;
 extern crate rust_base58;
 extern crate crypto;
-
+extern crate sgx_crypto_helper;
 use sgx_types::*;
 use sgx_urts::SgxEnclave;
 //use sgx_tseal::{SgxSealedData};
@@ -28,6 +28,8 @@ use std::path;
 use std::str;
 use rust_base58::{ToBase58, FromBase58};
 use crypto::ed25519::{keypair, verify};
+use sgx_crypto_helper::RsaKeyPair;
+use sgx_crypto_helper::rsa3072::Rsa3072KeyPair;
 
 static ENCLAVE_FILE: &'static str = "enclave.signed.so";
 static ENCLAVE_TOKEN: &'static str = "enclave.token";
@@ -199,5 +201,52 @@ fn main() {
         _ => {println!("[-] enclave signature is incorrect!");}
     }
 
+    //////////////////////////////////777
+    // retrieve RSA pubkey
+
+    //allocate signature
+    let pubkey_size = 8192;
+    let mut pubkey = vec![0u8; pubkey_size as usize];
+
+    let result = unsafe {
+        get_rsa_encryption_pubkey(enclave.geteid(),
+                      &mut retval,
+                      pubkey.as_mut_ptr(),
+                      pubkey_size
+                      )
+    };
+
+    match result {
+        sgx_status_t::SGX_SUCCESS => {},
+        _ => {
+            println!("[-] ECALL Enclave Failed {}!", result.as_str());
+            return;
+        }
+    }
+    let rsa_keypair: Rsa3072KeyPair = serde_json::from_str(str::from_utf8(&pubkey[..]).unwrap()).unwrap();
+    // we actually should only get the pubkey here
+    //let rsa_pubkey = rsa_keypair.to_pubkey();
+    //self, plaintext: &[u8], ciphertext: &mut Vec<u8>
+    
+    let mut ciphertext : Vec<u8> = Vec::new();
+    let plaintext = b"This message is confidential".to_vec();
+    rsa_keypair.encrypt_buffer(&plaintext, &mut ciphertext).unwrap();
+    
+    let result = unsafe {
+        decrypt(enclave.geteid(),
+                      &mut retval,
+                      ciphertext.as_mut_ptr(),
+                      ciphertext.len() as u32
+                      )
+    };
+
+    match result {
+        sgx_status_t::SGX_SUCCESS => {},
+        _ => {
+            println!("[-] ECALL Enclave Failed {}!", result.as_str());
+            return;
+        }
+    }
+   
     enclave.destroy();
 }

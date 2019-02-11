@@ -14,9 +14,16 @@ run:
 [+] Open token file success! 
 [+] Token file invalid, will create new token file
 [+] Init Enclave Successful 2!
-enclave generated sealed keyair with pubkey: "BnQek3JGZgWaDQ38DeYemdrGb3kkbUk6wBYQKkFxcEfH"
-[+] enclave returned pubkey: "BnQek3JGZgWaDQ38DeYemdrGb3kkbUk6wBYQKkFxcEfH"
+[Enclave] generated sealed keyair with pubkey: "71Prcc3Mwe5kag7yaG1wciPKDBxx1UivWRweHJoNkZxG"
+[Enclave] SgxFile write key file success!
+[+] enclave returned pubkey: "71Prcc3Mwe5kag7yaG1wciPKDBxx1UivWRweHJoNkZxG"
 let enclave sign message: This message is true
-enclave restored sealed keyair with pubkey: "BnQek3JGZgWaDQ38DeYemdrGb3kkbUk6wBYQKkFxcEfH"
+[Enclave] restored sealed keyair with pubkey: "71Prcc3Mwe5kag7yaG1wciPKDBxx1UivWRweHJoNkZxG"
 [+] enclave signature is correct!
+[Enclave] Read 6198 bytes from Key file
+[Enclave] len pubkey_slice: 8192
+[Enclave] len keypair_json: 6198
+[Enclave] Read 6198 bytes from Key file
+[Enclave] decrypted data = This message is confidential
+
 ```
