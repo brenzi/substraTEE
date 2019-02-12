@@ -1,0 +1,8 @@
+[package]
+name = "wasm-test"
+version = "0.1.0"
+authors = ["Alain Brenzikofer <news@brenzi.ch>"]
+edition = "2018"
+
+[dependencies]
+wasmi = "*"
