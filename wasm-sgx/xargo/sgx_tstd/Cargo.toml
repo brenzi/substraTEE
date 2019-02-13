@@ -1,0 +1,36 @@
+[package]
+name = "std"
+version = "0.0.0"
+authors = ["Baidu"]
+build = "build.rs"
+
+[lib]
+name = "std"
+path = "../../sgx_tstd/src/lib.rs"
+crate-type = ["rlib"]
+
+[features]
+default = ["stdio"]
+backtrace = ["stdio"]
+stdio = []
+net = []
+untrusted_fs = []
+untrusted_time = []
+use_builtin_ocalls = []
+
+[build-dependencies]
+sgx_build_helper = { path = "../../../rust-sgx-sdk/build_helper" }
+
+[dependencies]
+sgx_types = { path = "../../../rust-sgx-sdk/sgx_types" }
+sgx_libc = { path = "../../../rust-sgx-sdk/sgx_libc" }
+sgx_trts = { path = "../../../rust-sgx-sdk/sgx_trts" }
+sgx_alloc = { path = "../../../rust-sgx-sdk/sgx_alloc" }
+sgx_tprotected_fs = { path = "../../../rust-sgx-sdk/sgx_tprotected_fs" }
+sgx_tcrypto = { path = "../../../rust-sgx-sdk/sgx_tcrypto" }
+sgx_tse = { path = "../../../rust-sgx-sdk/sgx_tse" }
+sgx_tseal = { path = "../../../rust-sgx-sdk/sgx_tseal" }
+sgx_tservice = { path = "../../../rust-sgx-sdk/sgx_tservice" }
+sgx_tkey_exchange = { path = "../../../rust-sgx-sdk/sgx_tkey_exchange" }
+sgx_tdh = { path = "../../../rust-sgx-sdk/sgx_tdh" }
+sgx_unwind = { path = "../../../rust-sgx-sdk/sgx_unwind" }

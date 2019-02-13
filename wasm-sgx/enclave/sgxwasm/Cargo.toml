@@ -4,11 +4,11 @@ version = "0.1.0"
 authors = ["Baidu"]
 
 [dependencies]
-wasmi = { path = "../../../../third_party/wasmi" }
-wabt-core = { path = "../../../../third_party/wabt-rs-core" }
-serde = { path = "../../../../third_party/serde-rs/serde/serde" }
-serde_derive = { path = "../../../../third_party/serde-rs/serde/serde_derive" }
+wasmi = { git = "https://github.com/baidu/rust-sgx-sdk" }
+wabt-core = { git = "https://github.com/baidu/rust-sgx-sdk" }
+serde = { git = "https://github.com/baidu/rust-sgx-sdk" }
+serde_derive = { git = "https://github.com/baidu/rust-sgx-sdk" }
 
 [target.'cfg(not(target_env = "sgx"))'.dependencies]
-sgx_types = { path = "../../../../sgx_types" }
-sgx_tstd = { path = "../../../../sgx_tstd" }
+sgx_types = { git = "https://github.com/baidu/rust-sgx-sdk" }
+sgx_tstd = { git = "https://github.com/baidu/rust-sgx-sdk" }
