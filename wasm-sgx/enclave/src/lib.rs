@@ -52,7 +52,7 @@ use sgxwasm::{SpecDriver, boundary_value_to_runtime_value, result_covert};
 use sgx_types::*;
 use std::slice;
 
-use wasmi::{ModuleInstance, ImportsBuilder, RuntimeValue, Error as InterpreterError, Module};
+use wasmi::{ModuleInstance, ImportsBuilder, RuntimeValue, Error as InterpreterError, Module, NopExternals};
 
 extern crate serde;
 extern crate serde_json;
@@ -68,11 +68,12 @@ fn sgxwasm_init() -> sgx_status_t {
     *sd = SpecDriver::new();
     sgx_status_t::SGX_SUCCESS
 }
-
-fn wasm_invoke(module : Option<String>, field : String, args : Vec<RuntimeValue>)
+/*
+fn wasm_invoke(module : Option<Vec<u8>>, field : String, args : Vec<RuntimeValue>)
               -> Result<Option<RuntimeValue>, InterpreterError> {
+    println!("[Enclave] wasm_invoke() called");
     let mut program = SPECDRIVER.lock().unwrap();
-    let module = program.module_or_last(module.as_ref().map(|x| x.as_ref()))
+    let module = program.module_or_last(module)
                         .expect(&format!("Expected program to have loaded module {:?}", module));
     module.invoke_export(&field, &args, program.spec_module())
 }
@@ -142,12 +143,12 @@ fn wasm_register(name: &Option<String>, as_name: String)
     let ref mut spec_driver = SPECDRIVER.lock().unwrap();
     spec_driver.register(name, as_name)
 }
-
+*/
 #[no_mangle]
 pub extern "C"
 fn sgxwasm_run_action(req_bin : *const u8, req_length: usize,
                       result_bin : *mut u8, result_max_len: usize) -> sgx_status_t {
-
+    println!("[Enclave] sgxwasm_run_action() called");
     let req_slice = unsafe { slice::from_raw_parts(req_bin, req_length) };
     let action_req: sgxwasm::SgxWasmAction = serde_json::from_slice(req_slice).unwrap();
 
@@ -159,9 +160,23 @@ fn sgxwasm_run_action(req_bin : *const u8, req_length: usize,
             let args = args.into_iter()
                            .map(|x| boundary_value_to_runtime_value(x))
                            .collect::<Vec<RuntimeValue>>();
-            let r = wasm_invoke(module, field, args);
+            let _module = Module::from_buffer(module.unwrap()).unwrap();
+            let instance =
+                ModuleInstance::new(
+                    &_module,
+                    &ImportsBuilder::default()
+                )
+                .expect("failed to instantiate wasm module")
+                .assert_no_start();
+            
+            let r = instance.invoke_export(&field, &args, &mut NopExternals);
+            
+            //let r = wasm_invoke(module, field, args);
+            println!("[Enclave] wasm_invoke successful");
             let r = result_covert(r);
+            println!("[Enclave] result_covert successful");
             response = serde_json::to_string(&r).unwrap();
+            println!("[Enclave] serialization successful");
             match r {
                 Ok(_) => {
                     return_status = sgx_status_t::SGX_SUCCESS;
@@ -171,7 +186,9 @@ fn sgxwasm_run_action(req_bin : *const u8, req_length: usize,
                }
             }
         },
+       
         sgxwasm::SgxWasmAction::Get{module,field} => {
+            /*
             let r = wasm_get(module, field);
             let r = result_covert(r);
             response = serde_json::to_string(&r).unwrap();
@@ -183,8 +200,12 @@ fn sgxwasm_run_action(req_bin : *const u8, req_length: usize,
                     return_status = sgx_status_t::SGX_ERROR_WASM_INTERPRETER_ERROR;
                 }
             }
+            */
+            return_status = sgx_status_t::SGX_ERROR_WASM_INTERPRETER_ERROR;
+            response = "not supported".to_string();
         },
         sgxwasm::SgxWasmAction::LoadModule{name,module} => {
+            /*
             let r = wasm_load_module(name.clone(), module);
             response = serde_json::to_string(&r).unwrap();
             match r {
@@ -195,8 +216,12 @@ fn sgxwasm_run_action(req_bin : *const u8, req_length: usize,
                     return_status = sgx_status_t::SGX_ERROR_WASM_LOAD_MODULE_ERROR;
                 }
             }
+            */
+            return_status = sgx_status_t::SGX_ERROR_WASM_INTERPRETER_ERROR;
+            response = "not supported".to_string();
         },
         sgxwasm::SgxWasmAction::TryLoad{module} => {
+            /*
             let r = wasm_try_load(module);
             response = serde_json::to_string(&r).unwrap();
             match r {
@@ -207,8 +232,12 @@ fn sgxwasm_run_action(req_bin : *const u8, req_length: usize,
                     return_status = sgx_status_t::SGX_ERROR_WASM_TRY_LOAD_ERROR;
                 }
             }
+            */
+            return_status = sgx_status_t::SGX_ERROR_WASM_INTERPRETER_ERROR;
+            response = "not supported".to_string();
         },
         sgxwasm::SgxWasmAction::Register{name, as_name} => {
+            /*
             let r = wasm_register(&name, as_name.clone());
             response = serde_json::to_string(&r).unwrap();
             match r {
@@ -219,7 +248,11 @@ fn sgxwasm_run_action(req_bin : *const u8, req_length: usize,
                     return_status = sgx_status_t::SGX_ERROR_WASM_REGISTER_ERROR;
                 }
             }
+            */
+            return_status = sgx_status_t::SGX_ERROR_WASM_INTERPRETER_ERROR;
+            response = "not supported".to_string();
         }
+        
     }
 
     //println!("len = {}, Response = {:?}", response.len(), response);

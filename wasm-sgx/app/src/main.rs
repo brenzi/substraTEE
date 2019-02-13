@@ -65,7 +65,7 @@ extern {
 #[derive(Debug, Serialize, Deserialize)]
 pub enum SgxWasmAction {
     Invoke {
-        module: Option<String>,
+        module: Option<Vec<u8>>,
         field: String,
         args: Vec<BoundaryValue>
     },
@@ -292,6 +292,7 @@ fn sgx_enclave_wasm_invoke(req_str : String,
     (result, ret_val)
 }
 
+/*
 fn sgx_enclave_wasm_load_module(module : Vec<u8>,
                                 name   : &Option<String>,
                                 enclave : &SgxEnclave)
@@ -318,8 +319,8 @@ fn sgx_enclave_wasm_load_module(module : Vec<u8>,
         },
     }
 }
-
-
+*/
+/*
 fn sgx_enclave_wasm_run_action(action : &Action, enclave : &SgxEnclave) -> Result<Option<RuntimeValue>, InterpreterError> {
     match action {
         &Action::Invoke {
@@ -330,7 +331,7 @@ fn sgx_enclave_wasm_run_action(action : &Action, enclave : &SgxEnclave) -> Resul
             // Deal with Invoke
             // Make a SgxWasmAction::Invoke structure and send it to sgx_enclave_wasm_invoke
             let req = SgxWasmAction::Invoke {
-                          module : module.as_ref().map(|x| x.clone()),
+                          module : module,
                           field  : field.clone(),
                           args   : args.into_iter()
                                        .map(wabt_runtime_value_to_boundary_value)
@@ -385,7 +386,8 @@ fn sgx_enclave_wasm_run_action(action : &Action, enclave : &SgxEnclave) -> Resul
         },
     }
 }
-
+*/
+/*
 // Malform
 fn sgx_enclave_wasm_try_load(module : &[u8], enclave : &SgxEnclave) -> Result<(), InterpreterError> {
     // Make a SgxWasmAction::TryLoad structure and send it to sgx_enclave_wasm_invoke
@@ -409,7 +411,8 @@ fn sgx_enclave_wasm_try_load(module : &[u8], enclave : &SgxEnclave) -> Result<()
         }
     }
 }
-
+*/
+/*
 // Register
 fn sgx_enclave_wasm_register(name : Option<String>,
                              as_name : String,
@@ -437,7 +440,9 @@ fn sgx_enclave_wasm_register(name : Option<String>,
         }
     }
 }
+*/
 
+/*
 fn wasm_main_loop(wast_file : &str, enclave : &SgxEnclave) -> Result<(), String> {
 
     // ScriptParser interface has changed. Need to feed it with wast content.
@@ -580,17 +585,7 @@ fn wasm_main_loop(wast_file : &str, enclave : &SgxEnclave) -> Result<(), String>
     Ok(())
 }
 
-fn run_a_wast(enclave   : &SgxEnclave,
-              wast_file : &str) -> Result<(), String> {
-
-    // Step 1: Init the sgxwasm spec driver engine
-    sgx_enclave_wasm_init(enclave)?;
-
-    // Step 2: Load the wast file and run
-    wasm_main_loop(wast_file, enclave)?;
-
-    Ok(())
-}
+*/
 
 fn main() {
 
@@ -605,15 +600,44 @@ fn main() {
         },
     };
 
-    let wast_list = vec![
-        
-        "../encointer_node_runtime.compact.wat",
-        ];
+    // Step 1: Init the sgxwasm spec driver engine
+    sgx_enclave_wasm_init(&enclave);
+    println!("[+] Init Wasm in Enclave Successful");
 
-    for wfile in wast_list {
-        println!("======================= testing {} =====================", wfile);
-        run_a_wast(&enclave, wfile).unwrap();
+    // read wasm file to string
+    use std::io::prelude::*;
+    let mut file = fs::File::open("runtime.compact.wasm").unwrap();
+    let mut module = Vec::new();
+    file.read_to_end(&mut module).unwrap();
+
+    let req = SgxWasmAction::Invoke {
+//                    module : module.as_ref().map(|x| x.clone()),
+                    module : Some(module),
+                    field  : "add_one".to_string(),
+                    args   : vec![BoundaryValue::I32(42)],
+    };
+
+    let result = sgx_enclave_wasm_invoke(serde_json::to_string(&req).unwrap(),
+                                                 MAXOUTPUT,
+                                                 &enclave);
+    match result {
+        (result, sgx_status_t::SGX_SUCCESS) => {
+            let result_obj : Result<Option<RuntimeValue>, InterpreterError> = answer_convert(result);
+            println!("result: {:?}", result_obj);
+        },
+        (result, sgx_status_t::SGX_ERROR_WASM_INTERPRETER_ERROR) => {
+            let result_obj : Result<Option<RuntimeValue>, InterpreterError> = answer_convert(result);
+            println!("result: {:?}", result_obj);
+        },
+        (_, _) => {
+            println!("sgx_enclave_wasm_run_action::Invoke returned unknown error!");
+            panic!("sgx_enclave_wasm_run_action::Invoke returned unknown error!");
+        },
     }
+    // Step 2: Load the wast file and run
+    //wasm_main_loop("runtime.compact.wasm", enclave)?;
+
+ 
 
     enclave.destroy();
     println!("[+] run_wasm success...");

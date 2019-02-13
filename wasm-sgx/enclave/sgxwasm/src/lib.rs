@@ -80,7 +80,7 @@ extern crate serde_derive;
 #[derive(Debug, Serialize, Deserialize)]
 pub enum SgxWasmAction {
     Invoke {
-        module: Option<String>,
+        module: Option<Vec<u8>>,
         field: String,
         args: Vec<BoundaryValue>
     },
