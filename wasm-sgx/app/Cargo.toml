@@ -1,0 +1,15 @@
+[package]
+name = "app"
+version = "1.0.0"
+authors = ["Baidu"]
+build = "build.rs"
+
+[dependencies]
+sgx_types = { path = "../../rust-sgx-sdk/sgx_types" }
+sgx_urts = { path = "../../rust-sgx-sdk/sgx_urts" }
+wabt = "0.4.0"
+serde = {version = "=1.0.84"}
+serde_json = {version = "=1.0.36"}
+serde_derive = {version = "=1.0.84"}
+dirs = "1.0.2"
+nan-preserving-float = "0.1.0"
